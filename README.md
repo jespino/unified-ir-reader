@@ -2,6 +2,8 @@
 
 A Go tool to decode and display the contents of `__.PKGDEF` files from Go `.a` archive files in human-readable format. Supports reading and parsing Go's Unified IR (UIR) export data format.
 
+This program was created as part of the efforts to explain how the Go compiler works at [Internals for Interns](https://internals-for-interns.com). It is specifically designed to work with **Go 1.25**.
+
 ## What is __.PKGDEF?
 
 When Go compiles a package, it creates a `.a` archive file containing two key components:
