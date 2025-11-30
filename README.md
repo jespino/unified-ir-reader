@@ -71,18 +71,18 @@ Total Elements: 256
 Fingerprint: 8843588eb035041c
 
 === Section Statistics ===
-  String      :   67 elements
-  Meta        :    2 elements
-  PosBase     :    1 elements
-  Pkg         :    2 elements
-  Name        :   29 elements
-  Type        :   61 elements
-  Obj         :   29 elements
-  ObjExt      :   29 elements
-  ObjDict     :   29 elements
-  Body        :    7 elements
+  SectionString   :   67 elements
+  SectionMeta     :    2 elements
+  SectionPosBase  :    1 elements
+  SectionPkg      :    2 elements
+  SectionName     :   29 elements
+  SectionType     :   61 elements
+  SectionObj      :   29 elements
+  SectionObjExt   :   29 elements
+  SectionObjDict  :   29 elements
+  SectionBody     :    7 elements
 
-=== String Table (Deduplicated Strings) ===
+=== SectionString (Deduplicated Strings) ===
 Total strings: 67
 (showing first 50)
 
@@ -93,17 +93,17 @@ Total strings: 67
   [  4] "ID"
   ...
 
-=== Position Bases (Source Files) ===
+=== SectionPosBase (Source File Locations) ===
   [0] /Users/.../complex.go (file base)
 
-=== Package Table ===
+=== SectionPkg (Package References) ===
   [0] <unlinkable> (name: complex)
   [1] builtin (system package)
 
-=== Type Table ===
+=== SectionType (Type Definitions) ===
 Total types: 61
 
-=== Object Table Summary ===
+=== SectionObj (Object Declarations) ===
 Total objects: 29
   Const     : 5
   Alias     : 2
@@ -111,7 +111,7 @@ Total objects: 29
   Type      : 15
   Stub      : 3
 
-=== Private Root (Function Bodies & Internal Data) ===
+=== SectionMeta - Private Root (Function Bodies & Internal Data) ===
 Has .inittask: false
 Function bodies: 5
 
@@ -131,34 +131,34 @@ The tool reveals the complete internal structure of the Unified IR format:
 
 ### Section Statistics
 Shows element counts for each of the 10 sections:
-- **String**: Deduplicated strings (identifiers, paths, literals)
-- **Meta**: Metadata including public and private roots
-- **PosBase**: Position bases (source file paths)
-- **Pkg**: Package references
-- **Name**: Reserved section for names
-- **Type**: Type definitions
-- **Obj**: Object declarations (constants, variables, functions, types)
-- **ObjExt**: Extended object information
-- **ObjDict**: Object dictionaries for generics
-- **Body**: Function bodies for inlining
+- **SectionString**: Deduplicated strings (identifiers, paths, literals)
+- **SectionMeta**: Metadata including public and private roots
+- **SectionPosBase**: Position bases (source file paths)
+- **SectionPkg**: Package references
+- **SectionName**: Reserved section for names
+- **SectionType**: Type definitions
+- **SectionObj**: Object declarations (constants, variables, functions, types)
+- **SectionObjExt**: Extended object information
+- **SectionObjDict**: Object dictionaries for generics
+- **SectionBody**: Function bodies for inlining
 
-### String Table
+### SectionString
 All strings used in the package, deduplicated and indexed. Includes:
 - Package and import paths
 - Identifier names (types, functions, fields, parameters)
 - String literals from constants
 - Special markers like "esc:" for escape analysis
 
-### Position Bases
+### SectionPosBase
 Source file paths where declarations are defined. Shows whether each position is a file base or line base (for `//line` directives).
 
-### Package Table
+### SectionPkg
 All packages referenced by this package, including:
 - The package itself (usually shown as `<self>`)
 - Imported packages
 - Built-in packages (`builtin`, `unsafe`)
 
-### Type Table
+### SectionType
 Count of type definitions. Types include:
 - Basic types (int, string, bool, etc.)
 - Named types (custom types)
@@ -167,7 +167,7 @@ Count of type definitions. Types include:
 - Structs and interfaces
 - Generic type parameters
 
-### Object Table Summary
+### SectionObj
 Breakdown of exported objects by kind:
 - **Const**: Constants
 - **Var**: Variables
@@ -176,7 +176,7 @@ Breakdown of exported objects by kind:
 - **Alias**: Type aliases
 - **Stub**: Import stubs for referenced external symbols
 
-### Private Root
+### SectionMeta - Private Root
 Internal data not exported but stored for compiler use:
 - **Has .inittask**: Whether package has an init function
 - **Function bodies**: List of functions with stored bodies for inlining

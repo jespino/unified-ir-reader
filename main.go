@@ -158,26 +158,26 @@ func showDetailedFormat(exportData []byte, limit int) error {
 		kind pkgbits.SectionKind
 		name string
 	}{
-		{pkgbits.SectionString, "String"},
-		{pkgbits.SectionMeta, "Meta"},
-		{pkgbits.SectionPosBase, "PosBase"},
-		{pkgbits.SectionPkg, "Pkg"},
-		{pkgbits.SectionName, "Name"},
-		{pkgbits.SectionType, "Type"},
-		{pkgbits.SectionObj, "Obj"},
-		{pkgbits.SectionObjExt, "ObjExt"},
-		{pkgbits.SectionObjDict, "ObjDict"},
-		{pkgbits.SectionBody, "Body"},
+		{pkgbits.SectionString, "SectionString"},
+		{pkgbits.SectionMeta, "SectionMeta"},
+		{pkgbits.SectionPosBase, "SectionPosBase"},
+		{pkgbits.SectionPkg, "SectionPkg"},
+		{pkgbits.SectionName, "SectionName"},
+		{pkgbits.SectionType, "SectionType"},
+		{pkgbits.SectionObj, "SectionObj"},
+		{pkgbits.SectionObjExt, "SectionObjExt"},
+		{pkgbits.SectionObjDict, "SectionObjDict"},
+		{pkgbits.SectionBody, "SectionBody"},
 	}
 
 	for _, sec := range sections {
 		count := decoder.NumElems(sec.kind)
-		fmt.Printf("  %-12s: %4d elements\n", sec.name, count)
+		fmt.Printf("  %-16s: %4d elements\n", sec.name, count)
 	}
 	fmt.Println()
 
 	// Show string table
-	fmt.Println("=== String Table (Deduplicated Strings) ===")
+	fmt.Println("=== SectionString (Deduplicated Strings) ===")
 	stringCount := decoder.NumElems(pkgbits.SectionString)
 	if stringCount > 0 {
 		fmt.Printf("Total strings: %d\n", stringCount)
@@ -207,7 +207,7 @@ func showDetailedFormat(exportData []byte, limit int) error {
 	fmt.Println()
 
 	// Show position bases (source files)
-	fmt.Println("=== Position Bases (Source Files) ===")
+	fmt.Println("=== SectionPosBase (Source File Locations) ===")
 	posBaseCount := decoder.NumElems(pkgbits.SectionPosBase)
 	if posBaseCount > 0 {
 		maxShow := posBaseCount
@@ -234,7 +234,7 @@ func showDetailedFormat(exportData []byte, limit int) error {
 	fmt.Println()
 
 	// Show package table
-	fmt.Println("=== Package Table ===")
+	fmt.Println("=== SectionPkg (Package References) ===")
 	pkgCount := decoder.NumElems(pkgbits.SectionPkg)
 	if pkgCount > 0 {
 		maxShow := pkgCount
@@ -268,13 +268,13 @@ func showDetailedFormat(exportData []byte, limit int) error {
 	fmt.Println()
 
 	// Show type table summary
-	fmt.Println("=== Type Table ===")
+	fmt.Println("=== SectionType (Type Definitions) ===")
 	typeCount := decoder.NumElems(pkgbits.SectionType)
 	fmt.Printf("Total types: %d\n", typeCount)
 	fmt.Println()
 
 	// Show object table
-	fmt.Println("=== Object Table Summary ===")
+	fmt.Println("=== SectionObj (Object Declarations) ===")
 	objCount := decoder.NumElems(pkgbits.SectionObj)
 	if objCount > 0 {
 		objCounts := make(map[string]int)
@@ -292,7 +292,7 @@ func showDetailedFormat(exportData []byte, limit int) error {
 	fmt.Println()
 
 	// Show private root (function bodies)
-	fmt.Println("=== Private Root (Function Bodies & Internal Data) ===")
+	fmt.Println("=== SectionMeta - Private Root (Function Bodies & Internal Data) ===")
 	r := decoder.NewDecoder(pkgbits.SectionMeta, pkgbits.PrivateRootIdx, pkgbits.SyncPrivate)
 	hasInittask := r.Bool()
 	fmt.Printf("Has .inittask: %v\n", hasInittask)
