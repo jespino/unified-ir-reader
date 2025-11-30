@@ -7,10 +7,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"go/importer"
-	"go/token"
-	"go/types"
-	"io"
 	"os"
 	"strings"
 
@@ -56,15 +52,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Show detailed binary format information
+	// Show binary format information
 	if err := showDetailedFormat(uirData, *limit); err != nil {
-		fmt.Fprintf(os.Stderr, "Error decoding detailed format: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Decode using the official go/types importer
-	if err := decodeWithGoTypes(uirData); err != nil {
-		fmt.Fprintf(os.Stderr, "Error decoding with go/types: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error decoding format: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -149,7 +139,7 @@ func showDetailedFormat(exportData []byte, limit int) error {
 	decoder := pkgbits.NewPkgDecoder("", string(exportData[1:]))
 
 	fmt.Println("╔═══════════════════════════════════════════════════════════════╗")
-	fmt.Println("║          Unified IR Binary Format - Detailed View            ║")
+	fmt.Println("║                   Unified IR Binary Format                    ║")
 	fmt.Println("╚═══════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
@@ -281,7 +271,6 @@ func showDetailedFormat(exportData []byte, limit int) error {
 	fmt.Println("=== Type Table ===")
 	typeCount := decoder.NumElems(pkgbits.SectionType)
 	fmt.Printf("Total types: %d\n", typeCount)
-	fmt.Println("(Type details shown in parsed view below)")
 	fmt.Println()
 
 	// Show object table
@@ -335,261 +324,6 @@ func showDetailedFormat(exportData []byte, limit int) error {
 	fmt.Println()
 
 	return nil
-}
-
-// buildPKGDEF builds the __.PKGDEF content from export data
-func buildPKGDEF(exportData []byte) []byte {
-	var buf bytes.Buffer
-	// Write a minimal package header
-	buf.WriteString("go object darwin amd64 go1.23 X:regabireflect,regabiwrappers,coverageredesign\n")
-	buf.WriteString("\n$$B\n")
-	buf.Write(exportData)
-	buf.WriteString("\n$$\n")
-	return buf.Bytes()
-}
-
-// writeArchiveEntry writes an archive entry with proper formatting
-func writeArchiveEntry(w *bytes.Buffer, name string, content []byte) {
-	// Archive entry header is 60 bytes:
-	// 0-15:   File name (padded with spaces)
-	// 16-27:  File modification timestamp (decimal)
-	// 28-33:  Owner ID (decimal)
-	// 34-39:  Group ID (decimal)
-	// 40-47:  File mode (octal)
-	// 48-57:  File size (decimal)
-	// 58-59:  Ending characters (`\n)
-
-	header := fmt.Sprintf("%-16s%-12d%-6d%-6d%-8s%-10d`\n",
-		name, 0, 0, 0, "644", len(content))
-
-	w.WriteString(header)
-	w.Write(content)
-
-	// Archive entries are 2-byte aligned
-	if len(content)%2 == 1 {
-		w.WriteByte('\n')
-	}
-}
-
-// decodeWithGoTypes uses the official go/types importer to decode the package
-func decodeWithGoTypes(exportData []byte) error {
-	fmt.Println("╔═══════════════════════════════════════════════════════════════╗")
-	fmt.Println("║               Package Export Data (Parsed View)               ║")
-	fmt.Println("╚═══════════════════════════════════════════════════════════════╝")
-	fmt.Println()
-
-	// The importer expects a complete package archive file format
-	// Build a minimal archive file with just the export data
-	var buf bytes.Buffer
-
-	// Write archive header
-	buf.WriteString("!<arch>\n")
-
-	// Write __.PKGDEF entry
-	pkgdefContent := buildPKGDEF(exportData)
-	writeArchiveEntry(&buf, "__.PKGDEF", pkgdefContent)
-
-	// Create a temporary package to import
-	fset := token.NewFileSet()
-
-	// Use a custom import function that provides our data
-	lookup := func(path string) (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(buf.Bytes())), nil
-	}
-
-	imp := importer.ForCompiler(fset, "gc", lookup)
-
-	// Import the package
-	pkg, err := imp.Import("example")
-	if err != nil {
-		return fmt.Errorf("failed to import package: %v", err)
-	}
-
-	// Display package information
-	fmt.Println("=== Package Information ===")
-	fmt.Printf("Name: %s\n", pkg.Name())
-	fmt.Printf("Path: %s\n", pkg.Path())
-	fmt.Printf("Complete: %v\n", pkg.Complete())
-	fmt.Println()
-
-	// Display imports
-	imports := pkg.Imports()
-	if len(imports) > 0 {
-		fmt.Println("=== Imports ===")
-		for _, imp := range imports {
-			fmt.Printf("  %s\n", imp.Path())
-		}
-		fmt.Println()
-	}
-
-	// Display exported objects
-	fmt.Println("=== Exported Declarations ===")
-	scope := pkg.Scope()
-	names := scope.Names()
-
-	if len(names) == 0 {
-		fmt.Println("  (no exported objects)")
-		fmt.Println()
-		return nil
-	}
-
-	// Group objects by kind
-	consts := []types.Object{}
-	vars := []types.Object{}
-	funcs := []types.Object{}
-	typesObj := []types.Object{}
-
-	for _, name := range names {
-		obj := scope.Lookup(name)
-		switch obj.(type) {
-		case *types.Const:
-			consts = append(consts, obj)
-		case *types.Var:
-			vars = append(vars, obj)
-		case *types.Func:
-			funcs = append(funcs, obj)
-		case *types.TypeName:
-			typesObj = append(typesObj, obj)
-		}
-	}
-
-	// Print constants
-	if len(consts) > 0 {
-		fmt.Println("Constants:")
-		for _, obj := range consts {
-			c := obj.(*types.Const)
-			fmt.Printf("  const %s %s = %s\n", c.Name(), c.Type(), c.Val())
-		}
-		fmt.Println()
-	}
-
-	// Print variables
-	if len(vars) > 0 {
-		fmt.Println("Variables:")
-		for _, obj := range vars {
-			v := obj.(*types.Var)
-			fmt.Printf("  var %s %s\n", v.Name(), v.Type())
-		}
-		fmt.Println()
-	}
-
-	// Print types
-	if len(typesObj) > 0 {
-		fmt.Println("Types:")
-		for _, obj := range typesObj {
-			tn := obj.(*types.TypeName)
-			fmt.Printf("  type %s %s\n", tn.Name(), formatType(tn.Type()))
-
-			// For named types, show methods
-			if named, ok := tn.Type().(*types.Named); ok {
-				if named.NumMethods() > 0 {
-					for i := 0; i < named.NumMethods(); i++ {
-						method := named.Method(i)
-						fmt.Printf("      func (%s) %s%s\n", tn.Name(), method.Name(), formatSignature(method.Type().(*types.Signature)))
-					}
-				}
-			}
-		}
-		fmt.Println()
-	}
-
-	// Print functions
-	if len(funcs) > 0 {
-		fmt.Println("Functions:")
-		for _, obj := range funcs {
-			f := obj.(*types.Func)
-			sig := f.Type().(*types.Signature)
-			fmt.Printf("  func %s%s\n", f.Name(), formatSignature(sig))
-		}
-		fmt.Println()
-	}
-
-	return nil
-}
-
-// formatType formats a type for display
-func formatType(t types.Type) string {
-	switch typ := t.(type) {
-	case *types.Named:
-		// For named types, show the underlying type
-		return typ.Obj().Name() + " " + formatType(typ.Underlying())
-	case *types.Struct:
-		if typ.NumFields() == 0 {
-			return "struct{}"
-		}
-		result := "struct {\n"
-		for i := 0; i < typ.NumFields(); i++ {
-			field := typ.Field(i)
-			result += fmt.Sprintf("      %s %s\n", field.Name(), field.Type())
-		}
-		result += "    }"
-		return result
-	case *types.Interface:
-		if typ.NumMethods() == 0 {
-			return "interface{}"
-		}
-		result := "interface {\n"
-		for i := 0; i < typ.NumMethods(); i++ {
-			method := typ.Method(i)
-			sig := method.Type().(*types.Signature)
-			result += fmt.Sprintf("      %s %s\n", method.Name(), formatSignature(sig))
-		}
-		result += "    }"
-		return result
-	default:
-		return t.String()
-	}
-}
-
-// formatSignature formats a function signature
-func formatSignature(sig *types.Signature) string {
-	params := formatTuple(sig.Params(), sig.Variadic(), true)
-	results := formatTuple(sig.Results(), false, false)
-
-	if results == "" || results == "()" {
-		return params
-	}
-	return params + " " + results
-}
-
-// formatTuple formats a parameter or result tuple
-// isParams indicates whether this is a parameter tuple (always needs parens) or result tuple
-func formatTuple(tuple *types.Tuple, variadic bool, isParams bool) string {
-	if tuple.Len() == 0 {
-		if isParams {
-			return "()"
-		}
-		return ""
-	}
-
-	parts := make([]string, tuple.Len())
-	for i := 0; i < tuple.Len(); i++ {
-		v := tuple.At(i)
-		typeStr := v.Type().String()
-
-		// Handle variadic parameter
-		if variadic && i == tuple.Len()-1 {
-			// Convert []T to ...T
-			if strings.HasPrefix(typeStr, "[]") {
-				typeStr = "..." + typeStr[2:]
-			}
-		}
-
-		if v.Name() != "" {
-			parts[i] = v.Name() + " " + typeStr
-		} else {
-			parts[i] = typeStr
-		}
-	}
-
-	result := "(" + strings.Join(parts, ", ") + ")"
-
-	// If single unnamed result (not params), omit the parentheses
-	if !isParams && tuple.Len() == 1 && tuple.At(0).Name() == "" {
-		return tuple.At(0).Type().String()
-	}
-
-	return result
 }
 
 // typeCodeName returns a human-readable name for a type code
