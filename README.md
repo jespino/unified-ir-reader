@@ -1,66 +1,45 @@
-# unified-ir-reader
+# 🔍 unified-ir-reader
 
-A Go tool to decode and display the contents of `__.PKGDEF` files from Go `.a` archive files in human-readable format. Supports reading and parsing Go's Unified IR (UIR) export data format.
+> Peek inside Go's compiler cache and see what's really happening behind the scenes
 
-This program was created as part of the efforts to explain how the Go compiler works at [Internals for Interns](https://internals-for-interns.com). It is specifically designed to work with **Go 1.25**.
+Ever wondered what the Go compiler actually stores in those `.a` archive files? This tool decodes the internal format and shows you exactly what's inside—in plain English.
 
-## What is __.PKGDEF?
+**Built for [Internals for Interns](https://internals-for-interns.com)** • **Works with Go 1.25**
 
-When Go compiles a package, it creates a `.a` archive file containing two key components:
+---
 
-1. **`__.PKGDEF`** - Export data in Unified IR format containing:
-   - Package metadata and type information
-   - Exported symbols and their signatures
-   - Interface definitions
-   - Constants and their values
-   - Used by the compiler during type checking of dependent packages
-
-2. **`_go_.o`** - Object file containing:
-   - Symbol definitions and machine code
-   - Relocations and data sections
-   - Used by the linker to create the final binary
-
-## Unified IR Format
-
-The Unified IR (UIR) format is Go's binary export data format introduced in Go 1.17+. It stores package export information in a compact, efficient binary representation that includes:
-
-- Package path and name
-- Exported constants, variables, functions, and types
-- Type definitions including structs, interfaces, and function signatures
-- Generic type parameters and constraints
-- Build-time metadata
-
-The format uses:
-- Variable-width integers for compact storage
-- Section-based organization (String, Meta, Pkg, Type, Obj, etc.)
-- Reference tables for efficient cross-referencing
-- Optional sync markers for debugging
-
-## Usage
+## 🚀 Quick Start
 
 ```bash
-# Build the tool
-go build -o unified-ir-reader
+# Install
+go install github.com/jespino/unified-ir-reader@latest
 
-# Decode and display a .a archive file (shows all content)
-./unified-ir-reader path/to/package.a
+# Use it
+unified-ir-reader path/to/package.a
 
-# Limit the number of entries shown per section
-./unified-ir-reader --limit 10 path/to/package.a
-
-# Show help
-./unified-ir-reader --help
+# For large packages, limit the output
+unified-ir-reader --limit 10 path/to/package.a
 ```
 
-### Options
+---
 
-- `--limit N`: Limit the number of entries shown per section (0 = show all, default: 0)
-  - Applies to: String table, Position bases, Package table, Function bodies
-  - Useful for large packages to get a quick overview without overwhelming output
+## 💡 What Does It Do?
 
-## Output
+When you compile a Go program, the compiler creates `.a` archive files that contain two things:
 
-The tool displays comprehensive information about the Unified IR format:
+- **`__.PKGDEF`** — The package's "contract": what functions, types, and constants it exports
+- **`_go_.o`** — The actual machine code that runs
+
+This tool reads the `__.PKGDEF` section and shows you:
+- All the strings used in your package
+- What other packages it depends on
+- Type definitions and function signatures
+- Which functions can be inlined
+- And much more!
+
+---
+
+## 📊 Example Output
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
@@ -75,163 +54,136 @@ Fingerprint: 8843588eb035041c
 === Section Statistics ===
   SectionString   :   67 elements
   SectionMeta     :    2 elements
-  SectionPosBase  :    1 elements
   SectionPkg      :    2 elements
-  SectionName     :   29 elements
   SectionType     :   61 elements
   SectionObj      :   29 elements
-  SectionObjExt   :   29 elements
-  SectionObjDict  :   29 elements
   SectionBody     :    7 elements
+  ...
 
 === SectionString (Deduplicated Strings) ===
-Total strings: 67
-(showing first 50)
-
   [  0] ""
   [  1] "complex"
   [  2] "<unlinkable>"
   [  3] "/Users/.../complex.go"
-  [  4] "ID"
-  ...
-
-=== SectionPosBase (Source File Locations) ===
-  [0] /Users/.../complex.go (file base)
-
-=== SectionPkg (Package References) ===
-  [0] <unlinkable> (name: complex)
-  [1] builtin (system package)
-
-=== SectionType (Type Definitions) ===
-Total types: 61
-
-=== SectionObj (Object Declarations) ===
-Total objects: 29
-  Const     : 5
-  Alias     : 2
-  Func      : 4
-  Type      : 15
-  Stub      : 3
-
-=== SectionMeta - Private Root (Function Bodies & Internal Data) ===
-Has .inittask: false
-Function bodies: 5
-
-  [0] <unlinkable>.(*MyProcessor).Process (body index: 1)
-  [1] <unlinkable>.(*MyProcessor).Close (body index: 2)
   ...
 ```
 
-## Sections Displayed
+---
 
-The tool reveals the complete internal structure of the Unified IR format:
+## 🎯 What You'll See
 
-### Format Metadata
-- **Sync Markers**: Whether debug sync markers are enabled
-- **Total Elements**: Total number of elements across all sections
-- **Fingerprint**: 8-byte package fingerprint for cache validation
+### 📝 **SectionString** — All The Strings
+Every string in your package, stored once. If "main" appears 500 times in your code, it's stored once here and referenced everywhere else.
 
-### Section Statistics
-Shows element counts for each of the 10 sections:
-- **SectionString**: Deduplicated strings (identifiers, paths, literals)
-- **SectionMeta**: Metadata including public and private roots
-- **SectionPosBase**: Position bases (source file paths)
-- **SectionPkg**: Package references
-- **SectionName**: Reserved section for names
-- **SectionType**: Type definitions
-- **SectionObj**: Object declarations (constants, variables, functions, types)
-- **SectionObjExt**: Extended object information
-- **SectionObjDict**: Object dictionaries for generics
-- **SectionBody**: Function bodies for inlining
+### 📦 **SectionPkg** — Package Dependencies
+The full dependency graph—not just the packages you import, but everything they import too.
 
-### SectionString
-All strings used in the package, deduplicated and indexed. Includes:
-- Package and import paths
-- Identifier names (types, functions, fields, parameters)
-- String literals from constants
-- Special markers like "esc:" for escape analysis
+### 🏗️ **SectionType** — Type Information
+All the types: structs, interfaces, function signatures, generics, and more.
 
-### SectionPosBase
-Source file paths where declarations are defined. Shows whether each position is a file base or line base (for `//line` directives).
+### 🔧 **SectionObj** — Exported Declarations
+What your package exports: constants, variables, functions, and types.
 
-### SectionPkg
-All packages referenced by this package, including:
-- The package itself (usually shown as `<self>`)
-- Imported packages
-- Built-in packages (`builtin`, `unsafe`)
+### ⚡ **SectionBody** — Function Bodies
+The actual code for functions that can be inlined across packages.
 
-### SectionType
-Count of type definitions. Types include:
-- Basic types (int, string, bool, etc.)
-- Named types (custom types)
-- Compound types (pointers, slices, arrays, maps, channels)
-- Function signatures
-- Structs and interfaces
-- Generic type parameters
+### 🎛️ **SectionMeta** — Compiler Metadata
+Internal details like initialization tasks and optimization hints.
 
-### SectionObj
-Breakdown of exported objects by kind:
-- **Const**: Constants
-- **Var**: Variables
-- **Func**: Functions
-- **Type**: Type definitions
-- **Alias**: Type aliases
-- **Stub**: Import stubs for referenced external symbols
+---
 
-### SectionMeta - Private Root
-Internal data not exported but stored for compiler use:
-- **Has .inittask**: Whether package has an init function
-- **Function bodies**: List of functions with stored bodies for inlining
-  - Shows package path, symbol name, and body index
-  - Includes methods (e.g., `(*Type).Method`)
-
-## How It Works
-
-1. **Archive Parsing**: Reads the `.a` file and extracts the `__.PKGDEF` section
-2. **Export Data Extraction**: Locates the Unified IR data between `\n$$B\n` and `\n$$\n` markers
-3. **Binary Decoding**: Uses `internal/pkgbits` to decode the binary format and display all 10 sections
-4. **Display**: Formats and displays the complete internal structure of the Unified IR format
-
-## Implementation Details
-
-The decoder:
-- Parses the Unix archive format (AR) to extract `__.PKGDEF`
-- Uses `internal/pkgbits` package (vendored from Go toolchain) for binary decoding
-- Displays all 10 sections of the Unified IR format
-- Shows string deduplication, package references, type information, and function bodies
-- Applies configurable limits per section to manage output size
-
-## Building Test Archives
-
-To create a test archive:
+## 🛠️ Building From Source
 
 ```bash
-# Create a test package
+# Clone the repo
+git clone https://github.com/jespino/unified-ir-reader.git
+cd unified-ir-reader
+
+# Build
+go build -o unified-ir-reader
+
+# Run
+./unified-ir-reader path/to/package.a
+```
+
+---
+
+## 🧪 Creating Test Archives
+
+Want to see how your own code looks in the Unified IR format?
+
+```bash
+# Write some Go code
 cat > example.go << 'EOF'
 package example
 
-const ExportedConst = 42
+const Answer = 42
 
-type ExportedType struct {
-    Field int
+type Person struct {
+    Name string
+    Age  int
 }
 
-func ExportedFunc() {}
+func Greet(name string) string {
+    return "Hello, " + name
+}
 EOF
 
-# Compile to archive
+# Compile it
 go tool compile -pack -o example.a example.go
+
+# Decode it
+unified-ir-reader example.a
 ```
 
-## Related Source Files
+---
 
-In the Go source tree:
-- `src/cmd/compile/internal/noder/unified.go` - Unified IR writing
-- `src/cmd/compile/internal/gc/obj.go` - Archive creation
-- `src/internal/pkgbits/` - Binary encoding/decoding primitives
-- `src/go/internal/gcimporter/` - Import functionality
-- `src/cmd/go/internal/work/buildid.go` - Build cache management
+## 📚 Learn More
 
-## License
+Want to understand what's going on under the hood?
 
-This tool is for educational purposes. The Go source code it references is governed by the Go project's BSD-style license.
+Check out the [Internals for Interns](https://internals-for-interns.com) blog for deep dives into:
+- How the Go compiler works
+- What the Unified IR format is
+- Why compilation caching matters
+- And much more!
+
+### 🔗 Related Go Source Files
+
+If you want to explore the compiler source:
+- `src/cmd/compile/internal/noder/unified.go` — Where UIR gets written
+- `src/internal/pkgbits/` — The binary format encoder/decoder
+- `src/go/internal/gcimporter/` — How packages get imported
+
+---
+
+## ⚙️ Options
+
+| Flag | Description |
+|------|-------------|
+| `--limit N` | Show only the first N entries per section (default: show all) |
+| `--help` | Show usage information |
+
+---
+
+## 📖 About the Unified IR Format
+
+The Unified IR (Unified Intermediate Representation) is Go's binary format for package metadata, introduced in Go 1.17. It's how the compiler stores and shares information between packages.
+
+Think of it as a super-efficient filing system that:
+- **Deduplicates** everything (store "main" once, reference it everywhere)
+- **Organizes** data into specialized sections
+- **Enables** fast compilation and cross-package optimization
+- **Supports** modern features like generics
+
+---
+
+## 📄 License
+
+Educational tool for exploring Go internals. The Go source code is governed by the Go project's BSD-style license.
+
+---
+
+<p align="center">
+Made with ❤️ for Go learners everywhere
+</p>
