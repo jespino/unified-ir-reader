@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"go/importer"
 	"go/token"
@@ -17,17 +18,22 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <archive.a> [--detailed]\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Decodes and displays the contents of __.PKGDEF from a Go archive file\n")
-		fmt.Fprintf(os.Stderr, "\n")
+	// Define flags
+	limit := flag.Int("limit", 0, "Limit the number of entries shown per section (0 = show all)")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] <archive.a>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Decodes and displays the contents of __.PKGDEF from a Go archive file\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
-		fmt.Fprintf(os.Stderr, "  --detailed    Show detailed information about all sections\n")
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	if flag.NArg() < 1 {
+		flag.Usage()
 		os.Exit(1)
 	}
 
-	archivePath := os.Args[1]
-	detailed := len(os.Args) > 2 && os.Args[2] == "--detailed"
+	archivePath := flag.Arg(0)
 
 	// Read the archive file
 	data, err := os.ReadFile(archivePath)
@@ -51,11 +57,9 @@ func main() {
 	}
 
 	// Show detailed binary format information
-	if detailed {
-		if err := showDetailedFormat(uirData); err != nil {
-			fmt.Fprintf(os.Stderr, "Error decoding detailed format: %v\n", err)
-			os.Exit(1)
-		}
+	if err := showDetailedFormat(uirData, *limit); err != nil {
+		fmt.Fprintf(os.Stderr, "Error decoding detailed format: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Decode using the official go/types importer
@@ -140,7 +144,7 @@ func extractUnifiedIR(pkgdefData []byte) ([]byte, error) {
 }
 
 // showDetailedFormat shows detailed binary format information
-func showDetailedFormat(exportData []byte) error {
+func showDetailedFormat(exportData []byte, limit int) error {
 	// Skip the 'u' prefix
 	decoder := pkgbits.NewPkgDecoder("", string(exportData[1:]))
 
@@ -187,13 +191,14 @@ func showDetailedFormat(exportData []byte) error {
 	stringCount := decoder.NumElems(pkgbits.SectionString)
 	if stringCount > 0 {
 		fmt.Printf("Total strings: %d\n", stringCount)
-		maxShow := 50
-		if stringCount > maxShow {
+		maxShow := stringCount
+		if limit > 0 && limit < stringCount {
+			maxShow = limit
 			fmt.Printf("(showing first %d)\n", maxShow)
 		}
 		fmt.Println()
 
-		for i := 0; i < stringCount && i < maxShow; i++ {
+		for i := 0; i < maxShow; i++ {
 			str := decoder.StringIdx(pkgbits.Index(i))
 			if len(str) > 80 {
 				str = str[:77] + "..."
@@ -203,7 +208,7 @@ func showDetailedFormat(exportData []byte) error {
 			str = strings.ReplaceAll(str, "\t", "\\t")
 			fmt.Printf("  [%3d] %q\n", i, str)
 		}
-		if stringCount > maxShow {
+		if maxShow < stringCount {
 			fmt.Printf("  ... and %d more\n", stringCount-maxShow)
 		}
 	} else {
@@ -215,7 +220,11 @@ func showDetailedFormat(exportData []byte) error {
 	fmt.Println("=== Position Bases (Source Files) ===")
 	posBaseCount := decoder.NumElems(pkgbits.SectionPosBase)
 	if posBaseCount > 0 {
-		for i := 0; i < posBaseCount; i++ {
+		maxShow := posBaseCount
+		if limit > 0 && limit < posBaseCount {
+			maxShow = limit
+		}
+		for i := 0; i < maxShow; i++ {
 			r := decoder.NewDecoder(pkgbits.SectionPosBase, pkgbits.Index(i), pkgbits.SyncPosBase)
 			filename := r.String()
 			isFileBase := r.Bool()
@@ -226,6 +235,9 @@ func showDetailedFormat(exportData []byte) error {
 				fmt.Printf("  [%d] %s (line base)\n", i, filename)
 			}
 		}
+		if maxShow < posBaseCount {
+			fmt.Printf("  ... and %d more\n", posBaseCount-maxShow)
+		}
 	} else {
 		fmt.Println("  (none)")
 	}
@@ -235,7 +247,11 @@ func showDetailedFormat(exportData []byte) error {
 	fmt.Println("=== Package Table ===")
 	pkgCount := decoder.NumElems(pkgbits.SectionPkg)
 	if pkgCount > 0 {
-		for i := 0; i < pkgCount; i++ {
+		maxShow := pkgCount
+		if limit > 0 && limit < pkgCount {
+			maxShow = limit
+		}
+		for i := 0; i < maxShow; i++ {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
@@ -252,6 +268,9 @@ func showDetailedFormat(exportData []byte) error {
 					fmt.Printf("  [%d] %s (name: %s)\n", i, path, name)
 				}
 			}()
+		}
+		if maxShow < pkgCount {
+			fmt.Printf("  ... and %d more\n", pkgCount-maxShow)
 		}
 	} else {
 		fmt.Println("  (none)")
@@ -293,11 +312,20 @@ func showDetailedFormat(exportData []byte) error {
 	fmt.Printf("Function bodies: %d\n", bodyCount)
 	if bodyCount > 0 {
 		fmt.Println()
+		maxShow := bodyCount
+		if limit > 0 && limit < bodyCount {
+			maxShow = limit
+		}
 		for i := 0; i < bodyCount; i++ {
 			pkgPath := r.String()
 			symName := r.String()
 			bodyIdx := r.Reloc(pkgbits.SectionBody)
-			fmt.Printf("  [%d] %s.%s (body index: %d)\n", i, pkgPath, symName, bodyIdx)
+			if i < maxShow {
+				fmt.Printf("  [%d] %s.%s (body index: %d)\n", i, pkgPath, symName, bodyIdx)
+			}
+		}
+		if maxShow < bodyCount {
+			fmt.Printf("  ... and %d more\n", bodyCount-maxShow)
 		}
 	}
 	r.Sync(pkgbits.SyncEOF)

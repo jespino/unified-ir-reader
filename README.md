@@ -37,57 +37,32 @@ The format uses:
 ## Usage
 
 ```bash
-# Build the decoder
+# Build the tool
 go build -o unified-ir-reader
 
-# Decode a .a archive file (shows parsed view only)
+# Decode and display a .a archive file (shows all content)
 ./unified-ir-reader path/to/package.a
 
-# Show detailed binary format information
-./unified-ir-reader path/to/package.a --detailed
+# Limit the number of entries shown per section
+./unified-ir-reader --limit 10 path/to/package.a
+
+# Show help
+./unified-ir-reader --help
 ```
 
-## Output Modes
+### Options
 
-### Standard Mode
+- `--limit N`: Limit the number of entries shown per section (0 = show all, default: 0)
+  - Applies to: String table, Position bases, Package table, Function bodies
+  - Useful for large packages to get a quick overview without overwhelming output
 
-Shows the parsed, human-readable view of exported declarations:
+## Output
 
-```
-╔═══════════════════════════════════════════════════════════════╗
-║               Package Export Data (Parsed View)               ║
-╚═══════════════════════════════════════════════════════════════╝
+The tool displays comprehensive information about the Unified IR format in two sections:
 
-=== Package Information ===
-Name: example
-Path: example
-Complete: true
+### 1. Binary Format View
 
-=== Exported Declarations ===
-Constants:
-  const ExportedConst untyped int = 42
-  const ExportedString untyped string = "hello, world"
-
-Variables:
-  var ExportedVar int
-
-Types:
-  type ExportedInterface ExportedInterface interface {
-      Method1 () string
-      Method2 (int) error
-    }
-  type ExportedType ExportedType struct {
-      Field1 int
-      Field2 string
-    }
-
-Functions:
-  func ExportedFunc(a int, b string) (int, error)
-```
-
-### Detailed Mode (--detailed)
-
-Shows comprehensive binary format information before the parsed view:
+Shows the internal structure of the Unified IR format:
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
@@ -150,9 +125,45 @@ Function bodies: 5
   ...
 ```
 
-## Sections Displayed in Detailed Mode
+### 2. Parsed View
 
-The `--detailed` flag reveals the internal structure of the Unified IR format:
+Shows the human-readable parsed declarations:
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║               Package Export Data (Parsed View)               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+=== Package Information ===
+Name: example
+Path: example
+Complete: true
+
+=== Exported Declarations ===
+Constants:
+  const ExportedConst untyped int = 42
+  const ExportedString untyped string = "hello, world"
+
+Variables:
+  var ExportedVar int
+
+Types:
+  type ExportedInterface ExportedInterface interface {
+      Method1 () string
+      Method2 (int) error
+    }
+  type ExportedType ExportedType struct {
+      Field1 int
+      Field2 string
+    }
+
+Functions:
+  func ExportedFunc(a int, b string) (int, error)
+```
+
+## Sections Displayed
+
+The tool reveals the complete internal structure of the Unified IR format:
 
 ### Format Metadata
 - **Sync Markers**: Whether debug sync markers are enabled
@@ -217,9 +228,9 @@ Internal data not exported but stored for compiler use:
 
 1. **Archive Parsing**: Reads the `.a` file and extracts the `__.PKGDEF` section
 2. **Export Data Extraction**: Locates the Unified IR data between `\n$$B\n` and `\n$$\n` markers
-3. **Binary Decoding** (detailed mode): Uses `internal/pkgbits` to decode the binary format and show all sections
+3. **Binary Decoding**: Uses `internal/pkgbits` to decode the binary format and display all 10 sections
 4. **Type Parsing**: Uses Go's official `go/importer` and `go/types` packages to parse type information
-5. **Display**: Formats and displays the package information in human-readable form
+5. **Display**: Formats and displays both the binary format view and parsed declarations
 
 ## Implementation Details
 
