@@ -318,10 +318,6 @@ func showDetailedFormat(exportData []byte, limit int) error {
 		}
 	}
 	r.Sync(pkgbits.SyncEOF)
-	fmt.Println()
-
-	fmt.Println("═══════════════════════════════════════════════════════════════")
-	fmt.Println()
 
 	return nil
 }
